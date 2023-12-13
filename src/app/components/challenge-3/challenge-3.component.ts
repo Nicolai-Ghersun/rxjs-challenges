@@ -1,6 +1,6 @@
 import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
-import { Subject, catchError, ignoreElements, of, repeat, retry, share, startWith, switchMap, timer } from "rxjs";
+import { Subject, catchError, ignoreElements, map, of, repeat, retry, share, startWith, switchMap, timer } from "rxjs";
 import { COLLAPSE } from "../../animations";
 import { LoginService } from "../../services/login.service";
 
@@ -30,7 +30,7 @@ import { LoginService } from "../../services/login.service";
       </p>
     } @else {
       <p>
-        <button (click)="submit$.next()">Submit</button>
+        <button [disabled]="disabled$ | async" (click)="submit$.next()">Submit</button>
       </p>
     }
   `,
@@ -40,16 +40,21 @@ import { LoginService } from "../../services/login.service";
 export class Challenge3Component { 
   readonly service: LoginService = inject(LoginService);
   readonly submit$ = new Subject<void>();
-  readonly request$ = this.submit$.pipe(
+  readonly response$ = this.submit$.pipe(
     switchMap(()=>this.service.pipe(startWith(""))),
     share()
   );
-  readonly user$ = this.request$.pipe(retry());
-  readonly error$ = this.request$.pipe(
+  readonly user$ = this.response$.pipe(retry());
+  readonly error$ = this.response$.pipe(
     ignoreElements(),
     catchError(err=>of(err)),
     repeat(),
     switchMap(e => timer(5000).pipe(startWith(e)))
   ); 
+  readonly disabled$ = this.response$.pipe(
+    map(() => true),
+    catchError(() => of(false)),
+    repeat()
+  );
 }
 
