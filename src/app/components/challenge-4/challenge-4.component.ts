@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, Inject, inject } from "@angular/core";
 import { LoadingService } from "../../loading.service";
-import { Subject, animationFrameScheduler, concat, concatMap, filter, finalize, from, interval, map, merge, mergeMap, of, pairwise, race, range, repeat, scan, share, skipWhile, startWith, switchMap, take, tap } from "rxjs";
+import { Subject, animationFrameScheduler, asyncScheduler, concat, concatMap, distinctUntilChanged, filter, finalize, from, interval, map, merge, mergeMap, of, pairwise, race, range, repeat, scan, share, skipWhile, startWith, switchMap, take, takeUntil, tap } from "rxjs";
 import { CommonModule } from "@angular/common";
 
 @Component({
@@ -31,8 +31,9 @@ import { CommonModule } from "@angular/common";
   @if (progress$ | async; as progress) {
     <progress class="progress" [style.width.%]="progress"></progress>
     <div class="loading">Loading...</div>
-  } @else {
-    {{'final result'}}
+  } 
+  @if (finished$ | async; as result) {
+    {{result}} 
   }
   `,
   styleUrl: './challenge-4.component.css',
@@ -45,20 +46,18 @@ export class Challenge4Component {
   readonly request$ = this.submit$.pipe(switchMap(() => this.loadingService.load()), startWith(0),share());
 
   readonly finished$ = this.request$.pipe(skipWhile(v => typeof v === 'number'), tap(console.log));
-  readonly progress$ =
-    race(
-      this.finished$,
-      this.request$.pipe(
-        startWith(0),
-        filter((v): v is number => typeof v === 'number'),
-        pairwise<number>(),
-        switchMap(([prev, current]: [number, number]) => {
-          return from(Array.from({length: (current - prev) / 1 + 1 },(v, i) => prev + i * 1))
-            .pipe(concatMap(value => interval(50, animationFrameScheduler).pipe(take(1), map(() => value))))
-        }),
-      ),
-    
-  ).pipe(tap(console.log));
+  readonly progress$ = 
+    this.request$.pipe(
+      takeUntil(this.finished$),
+      startWith(0),                                                                                         
+      filter((v): v is number => typeof v === 'number'),                                                    
+      pairwise<number>(),                                                                                   
+      switchMap(([prev, current]: [number, number]) => {                                                    
+        return from(Array.from({length: (current - prev) / 1 + 1 },(v, i) => prev + i * 1))                 
+          .pipe(concatMap(value => interval(50, animationFrameScheduler).pipe(take(1), map(() => value)))) 
+      }),
+      map(v=>v==100 ? 0 : v)
+    );
       
   onButtonClick() {
     this.submit$.next();
